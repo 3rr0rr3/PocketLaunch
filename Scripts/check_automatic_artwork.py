@@ -30,7 +30,7 @@ documents = container / "Documents"
 documents.mkdir(parents=True, exist_ok=True)
 saved = documents / "games.json"
 custom = base64.b64encode(b"existing-custom-artwork-must-not-be-overwritten").decode()
-ids = [str(uuid.uuid4()) for _ in range(3)]
+ids = [str(uuid.uuid4()).upper() for _ in range(3)]
 games = [
     {"id": ids[0], "name": "South Park", "launchURL": "sidestore-org.nxnative.010095300b6a4000.5V7XAX44YG://", "favorite": True},
     {"id": ids[1], "name": "Custom cover", "launchURL": "org.nxnative.010095300b6a4000://", "favorite": False, "artwork": custom},
