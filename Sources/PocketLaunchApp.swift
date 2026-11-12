@@ -103,7 +103,7 @@ struct Game: Identifiable, Codable {
 
 struct LauncherView: View {
     @EnvironmentObject var library: Library
-    @Environment(\.openURL) var openURL
+    @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @State private var launchingGame: Game?
     @State private var artworkGame: Game?
@@ -114,145 +114,205 @@ struct LauncherView: View {
     @State private var busy = false
     @State private var error: String?
     @State private var downloadURL = ""
-    var filtered: [Game] {
+
+    private var filtered: [Game] {
         library.games.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }
             .sorted { $0.favorite != $1.favorite ? $0.favorite : $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
+    private var artworkLookupKey: String {
+        var key = String(artworkRetry) + (scenePhase == .active ? "-active" : "-inactive")
+        for game in library.games { key += game.id.uuidString + game.launchURL }
+        return key
+    }
+    private var showingError: Binding<Bool> {
+        Binding(get: { error != nil }, set: { if !$0 { error = nil } })
+    }
     var body: some View {
+        tabs
+            .tint(.mint)
+            .overlay { launchOverlay }
+            .task(id: artworkLookupKey) {
+                if scenePhase == .active { await library.resolveMissingArtwork() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { launchingGame = nil }
+            }
+            .sheet(item: $artworkGame) { game in
+                ArtworkEditor(game: game) { data in saveArtwork(data, for: game) }
+            }
+            .sheet(isPresented: $addGame) { AddGameView(add: appendGame) }
+            .fileImporter(isPresented: $importing,
+                          allowedContentTypes: [UTType(filenameExtension: "ipa") ?? .data],
+                          allowsMultipleSelection: true,
+                          onCompletion: handleImport)
+            .alert("PocketLaunch", isPresented: showingError) {
+                Button("OK") { error = nil }
+            } message: { Text(error ?? "") }
+    }
+
+    private var tabs: some View {
         TabView {
-            NavigationStack {
-                ScrollView {
-                    if filtered.isEmpty {
-                        ContentUnavailableView("Your games, together", systemImage: "gamecontroller.fill", description: Text("Add an installed game and its launch link to get started."))
-                    }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
-                        ForEach(filtered) { game in
-                            gameCard(game)
-                        }
-                    }.padding()
+            gamesTab.tabItem { Label("Games", systemImage: "gamecontroller") }
+            ipasTab.tabItem { Label("IPAs", systemImage: "shippingbox") }
+        }
+    }
+
+    private var gamesTab: some View {
+        NavigationStack {
+            ScrollView {
+                if filtered.isEmpty {
+                    ContentUnavailableView("Your games, together", systemImage: "gamecontroller.fill",
+                                           description: Text("Add an installed game and its launch link to get started."))
                 }
-                .navigationTitle("PocketLaunch").searchable(text: $query)
-                .toolbar { Button("Add game", systemImage: "plus") { addGame = true } }
-            }.tabItem { Label("Games", systemImage: "gamecontroller") }
-            NavigationStack {
-                List {
-                    Section {
-                        Button("Import IPA", systemImage: "square.and.arrow.down") { importing = true }.disabled(busy)
-                        if busy { ProgressView("Importing IPAs and reading icons…") }
-                        if let notice = library.importNotice { Text(notice).font(.footnote).foregroundStyle(.secondary) }
-                    } footer: { Text("Files are copied into this app. Share an IPA to your installation tool, then return to Games to add its launch link.") }
-                    Section("Your IPA files") {
-                        ForEach(library.files, id: \.self) { file in
-                            ShareLink(item: file) { Label(String(file.lastPathComponent.dropFirst(37)), systemImage: "shippingbox") }
-                        }
-                        .onDelete { offsets in
-                            for i in offsets { do { try FileManager.default.removeItem(at: library.files[i]) } catch { self.error = error.localizedDescription } }
-                            library.refresh()
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
+                    ForEach(filtered) { game in gameCard(game) }
+                }.padding()
+            }
+            .navigationTitle("PocketLaunch")
+            .searchable(text: $query)
+            .toolbar { Button("Add game", systemImage: "plus") { addGame = true } }
+        }
+    }
+
+    private var ipasTab: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button("Import IPA", systemImage: "square.and.arrow.down") { importing = true }.disabled(busy)
+                    if busy { ProgressView("Importing IPAs and reading icons…") }
+                    if let notice = library.importNotice {
+                        Text(notice).font(.footnote).foregroundStyle(.secondary)
+                    }
+                } footer: {
+                    Text("Files are copied into this app. Share an IPA to your installation tool, then return to Games to add its launch link.")
+                }
+                Section("Your IPA files") {
+                    ForEach(library.files, id: \.self) { file in
+                        ShareLink(item: file) {
+                            Label(String(file.lastPathComponent.dropFirst(37)), systemImage: "shippingbox")
                         }
                     }
-                    Section("Install a hosted IPA") {
-                        TextField("https://…/game.ipa", text: $downloadURL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                        Button("Install with SideStore", systemImage: "arrow.up.forward.app") { installRemote() }
-                    }
-                }.navigationTitle("IPA Library")
-            }.tabItem { Label("IPAs", systemImage: "shippingbox") }
-        }.tint(.mint)
-        .overlay {
-            if let game = launchingGame {
-                CartridgeLaunchView(game: game, cancel: { launchingGame = nil }) {
-                    guard launchingGame?.id == game.id else { return }
-                    launchingGame = nil
-                    launch(game.launchURL)
+                    .onDelete(perform: deleteIPAs)
                 }
-                .id(game.id)
-                .zIndex(100)
-            }
-        }
-        .task(id: library.games.map { $0.id.uuidString + $0.launchURL }.joined() + "\(artworkRetry)-\(scenePhase)") {
-            if scenePhase == .active { await library.resolveMissingArtwork() }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            if phase != .active { launchingGame = nil }
-        }
-        .sheet(item: $artworkGame) { game in
-            ArtworkEditor(game: game) { data in
-                guard let index = library.games.firstIndex(where: { $0.id == game.id }) else { return }
-                let previous = library.games[index]
-                library.games[index].artwork = data
-                library.games[index].automaticArtworkDisabled = data == nil
-                do { try library.save() }
-                catch { library.games[index] = previous; self.error = error.localizedDescription }
-            }
-        }
-        .sheet(isPresented: $addGame) { AddGameView { game in library.games.append(game); persist() } }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [UTType(filenameExtension: "ipa") ?? .data], allowsMultipleSelection: true) { result in
-            switch result {
-            case .success(let urls):
-                busy = true
-                Task {
-                    do { try await library.importFiles(urls) } catch { self.error = error.localizedDescription }
-                    library.refresh(); busy = false
+                Section("Install a hosted IPA") {
+                    TextField("https://…/game.ipa", text: $downloadURL)
+                        .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Button("Install with SideStore", systemImage: "arrow.up.forward.app", action: installRemote)
                 }
-            case .failure(let failure): error = failure.localizedDescription
-            }
+            }.navigationTitle("IPA Library")
         }
-        .alert("PocketLaunch", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("OK") { error = nil } } message: { Text(error ?? "") }
     }
 
     private func gameCard(_ game: Game) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-                                GameArtwork(data: game.artwork)
-                                    .frame(height: 150)
-                                    .frame(maxWidth: .infinity)
-                                    .clipped()
-                                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                                Text(game.name).font(.headline).lineLimit(2)
-                                if game.artwork == nil, let status = library.artworkStatuses[game.id] {
-                                    Text(status).font(.caption).foregroundStyle(.secondary)
-                                }
-                                Button("Play", systemImage: "play.fill") {
-                                    guard launchingGame == nil else { return }
-                                    launchingGame = game
-                                }
-                                    .buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
-                            }
-                            .padding().frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24))
-.contextMenu { gameMenu(game) }
+            GameArtwork(data: game.artwork)
+                .frame(height: 150).frame(maxWidth: .infinity).clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            Text(game.name).font(.headline).lineLimit(2)
+            if game.artwork == nil, let status = library.artworkStatuses[game.id] {
+                Text(status).font(.caption).foregroundStyle(.secondary)
+            }
+            Button("Play", systemImage: "play.fill") {
+                guard launchingGame == nil else { return }
+                launchingGame = game
+            }
+            .buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
+        }
+        .padding().frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24))
+        .contextMenu { gameMenu(game) }
     }
 
     @ViewBuilder private func gameMenu(_ game: Game) -> some View {
-
-                                Button("Change artwork", systemImage: "photo") { artworkGame = game }
-                                if game.artwork == nil {
-                                    Button("Find artwork automatically", systemImage: "sparkles") {
-                                        if let index = library.games.firstIndex(where: { $0.id == game.id }) {
-                                            library.games[index].automaticArtworkDisabled = false
-                                            persist()
-                                            artworkRetry += 1
-                                        }
-                                    }
-                                }
-                                Button(game.favorite ? "Unfavorite" : "Favorite", systemImage: "star") {
-                                    if let i = library.games.firstIndex(where: { $0.id == game.id }) { library.games[i].favorite.toggle(); persist() }
-                                }
-                                Button("Remove", role: .destructive) { removeGame(game) }
+        Button("Change artwork", systemImage: "photo") { artworkGame = game }
+        if game.artwork == nil {
+            Button("Find artwork automatically", systemImage: "sparkles") { retryArtwork(game) }
+        }
+        Button(game.favorite ? "Unfavorite" : "Favorite", systemImage: "star") { toggleFavorite(game) }
+        Button("Remove", role: .destructive) { removeGame(game) }
     }
 
-    private func removeGame(_ game: Game) {
-        library.games.removeAll(where: { candidate in candidate.id == game.id })
+    @ViewBuilder private var launchOverlay: some View {
+        if let game = launchingGame {
+            CartridgeLaunchView(game: game, cancel: { launchingGame = nil }) {
+                guard launchingGame?.id == game.id else { return }
+                launchingGame = nil
+                launch(game.launchURL)
+            }
+            .id(game.id).zIndex(100)
+        }
+    }
+
+    private func appendGame(_ game: Game) {
+        library.games.append(game)
         persist()
     }
-
-    func persist() { do { try library.save() } catch { self.error = error.localizedDescription } }
-    func launch(_ value: String) {
-        guard let url = URL(string: value), url.scheme != nil else { error = "Enter a valid game launch link."; return }
-        openURL(url) { accepted in if !accepted { error = "This link could not be opened. Check that the game is installed and registers this launch scheme." } }
+    private func saveArtwork(_ data: Data?, for game: Game) {
+        guard let index = library.games.firstIndex(where: { $0.id == game.id }) else { return }
+        let previous = library.games[index]
+        library.games[index].artwork = data
+        library.games[index].automaticArtworkDisabled = data == nil
+        do { try library.save() }
+        catch { library.games[index] = previous; self.error = error.localizedDescription }
     }
-    func installRemote() {
-        guard let url = URL(string: downloadURL.trimmingCharacters(in: .whitespacesAndNewlines)), url.scheme?.lowercased() == "https", url.host != nil else { error = "Enter an HTTPS download link for the IPA."; return }
+    private func retryArtwork(_ game: Game) {
+        guard let index = library.games.firstIndex(where: { $0.id == game.id }) else { return }
+        library.games[index].automaticArtworkDisabled = false
+        persist()
+        artworkRetry += 1
+    }
+    private func toggleFavorite(_ game: Game) {
+        guard let index = library.games.firstIndex(where: { $0.id == game.id }) else { return }
+        library.games[index].favorite.toggle()
+        persist()
+    }
+    private func removeGame(_ game: Game) {
+        library.games.removeAll { candidate in candidate.id == game.id }
+        persist()
+    }
+    private func deleteIPAs(_ offsets: IndexSet) {
+        for index in offsets {
+            do { try FileManager.default.removeItem(at: library.files[index]) }
+            catch { self.error = error.localizedDescription }
+        }
+        library.refresh()
+    }
+    private func handleImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            busy = true
+            Task { await importIPAs(urls) }
+        case .failure(let failure):
+            error = failure.localizedDescription
+        }
+    }
+    private func importIPAs(_ urls: [URL]) async {
+        defer { library.refresh(); busy = false }
+        do { try await library.importFiles(urls) }
+        catch { self.error = error.localizedDescription }
+    }
+    private func persist() {
+        do { try library.save() }
+        catch { self.error = error.localizedDescription }
+    }
+    private func launch(_ value: String) {
+        guard let url = URL(string: value), url.scheme != nil else {
+            error = "Enter a valid game launch link."; return
+        }
+        openURL(url) { accepted in
+            if !accepted {
+                error = "This link could not be opened. Check that the game is installed and registers this launch scheme."
+            }
+        }
+    }
+    private func installRemote() {
+        guard let url = URL(string: downloadURL.trimmingCharacters(in: .whitespacesAndNewlines)),
+              url.scheme?.lowercased() == "https", url.host != nil else {
+            error = "Enter an HTTPS download link for the IPA."; return
+        }
         var components = URLComponents()
-        components.scheme = "sidestore"; components.host = "install"
+        components.scheme = "sidestore"
+        components.host = "install"
         components.queryItems = [URLQueryItem(name: "url", value: url.absoluteString)]
         if let link = components.url { launch(link.absoluteString) }
     }
