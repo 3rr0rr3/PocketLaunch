@@ -16,6 +16,8 @@ targets:
       - path: IPACore
       - path: Resources/AutomaticArtwork
         buildPhase: resources
+      - path: Resources/Fonts
+        buildPhase: resources
     dependencies:
       - package: ZIPFoundation
     settings:

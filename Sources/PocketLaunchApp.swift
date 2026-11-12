@@ -98,7 +98,13 @@ struct Game: Identifiable, Codable {
 
 @main struct PocketLaunchApp: App {
     @StateObject private var library = Library()
-    var body: some Scene { WindowGroup { rootView.preferredColorScheme(.dark) } }
+    init() { ArcadeTypography.register() }
+    var body: some Scene {
+        WindowGroup {
+            rootView.preferredColorScheme(.dark)
+                .font(ArcadeTypography.font(12))
+        }
+    }
 
     @ViewBuilder private var rootView: some View {
         #if DEBUG
@@ -127,6 +133,7 @@ struct LauncherView: View {
     @State private var artworkRetry = 0
     @State private var query = ""
     @State private var addGame = false
+    @State private var showingIPALibrary = false
     @State private var importing = false
     @State private var busy = false
     @State private var error: String?
@@ -145,7 +152,7 @@ struct LauncherView: View {
         Binding(get: { error != nil }, set: { if !$0 { error = nil } })
     }
     var body: some View {
-        tabs
+        gamesTab
             .tint(.mint)
             .overlay { launchOverlay }
             .task(id: artworkLookupKey) {
@@ -158,6 +165,7 @@ struct LauncherView: View {
                 ArtworkEditor(game: game) { data in saveArtwork(data, for: game) }
             }
             .sheet(isPresented: $addGame) { AddGameView(add: appendGame) }
+            .sheet(isPresented: $showingIPALibrary) { ipasTab }
             .fileImporter(isPresented: $importing,
                           allowedContentTypes: [UTType(filenameExtension: "ipa") ?? .data],
                           allowsMultipleSelection: true,
@@ -165,13 +173,6 @@ struct LauncherView: View {
             .alert("Iphone Switch", isPresented: showingError) {
                 Button("OK") { error = nil }
             } message: { Text(error ?? "") }
-    }
-
-    private var tabs: some View {
-        TabView {
-            gamesTab.tabItem { Label("Games", systemImage: "gamecontroller") }
-            ipasTab.tabItem { Label("IPAs", systemImage: "shippingbox") }
-        }
     }
 
     private var gamesTab: some View {
@@ -182,7 +183,21 @@ struct LauncherView: View {
                 .navigationTitle("Iphone Switch")
                 .navigationBarTitleDisplayMode(.inline)
                 .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search games")
-                .toolbar { Button("Add game", systemImage: "plus") { addGame = true } }
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Text("Iphone Switch")
+                            .font(ArcadeTypography.font(13, relativeTo: .headline))
+                            .lineLimit(1).minimumScaleFactor(0.75)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Button("Add game", systemImage: "plus") { addGame = true }
+                            Button("IPA Library", systemImage: "shippingbox") { showingIPALibrary = true }
+                        } label: { Image(systemName: "plus") }
+                        .accessibilityLabel("Add game or open IPA Library")
+                    }
+                }
         }
     }
 
