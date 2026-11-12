@@ -176,18 +176,11 @@ struct LauncherView: View {
 
     private var gamesTab: some View {
         NavigationStack {
-            ScrollView {
-                if filtered.isEmpty {
-                    ContentUnavailableView("Your games, together", systemImage: "gamecontroller.fill",
-                                           description: Text("Add an installed game and its launch link to get started."))
-                }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), alignment: .top)], spacing: 16) {
-                    ForEach(filtered) { game in gameCard(game) }
-                }.padding()
-            }
-            .navigationTitle("PocketLaunch")
-            .searchable(text: $query)
-            .toolbar { Button("Add game", systemImage: "plus") { addGame = true } }
+            CartridgeShelfView(games: filtered, onPlay: playGame) { game in gameMenu(game) }
+                .navigationTitle("PocketLaunch")
+                .navigationBarTitleDisplayMode(.inline)
+                .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search games")
+                .toolbar { Button("Add game", systemImage: "plus") { addGame = true } }
         }
     }
 
@@ -220,24 +213,9 @@ struct LauncherView: View {
         }
     }
 
-    private func gameCard(_ game: Game) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            LibraryCartridgeView(artwork: game.artwork)
-            Text(game.name).font(.headline)
-                .lineLimit(2, reservesSpace: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if game.artwork == nil, let status = library.artworkStatuses[game.id] {
-                Text(status).font(.caption).foregroundStyle(.secondary)
-            }
-            Button("Play", systemImage: "play.fill") {
-                guard launchingGame == nil else { return }
-                launchingGame = game
-            }
-            .buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, 8)
-        .contextMenu { gameMenu(game) }
+    private func playGame(_ game: Game) {
+        guard launchingGame == nil else { return }
+        launchingGame = game
     }
 
     @ViewBuilder private func gameMenu(_ game: Game) -> some View {
