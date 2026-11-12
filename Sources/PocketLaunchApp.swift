@@ -14,6 +14,7 @@ struct Game: Identifiable, Codable {
 @MainActor final class Library: ObservableObject {
     @Published var games: [Game] = []
     @Published var files: [URL] = []
+    @Published var importNotice: String?
     let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     var archive: URL { root.appendingPathComponent("IPAs", isDirectory: true) }
     var index: URL { root.appendingPathComponent("games.json") }
@@ -28,8 +29,10 @@ struct Game: Identifiable, Codable {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
     func importFiles(_ urls: [URL]) async throws {
+        importNotice = nil
         let destination = archive
-        try await Task.detached(priority: .userInitiated) {
+        let imported = try await Task.detached(priority: .userInitiated) {
+            var imported: [(IPAIconMetadata, Data)] = []
             try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
             for url in urls {
                 let access = url.startAccessingSecurityScopedResource()
@@ -44,8 +47,26 @@ struct Game: Identifiable, Codable {
                 }
                 if let error = coordinationError { throw error }
                 if let error = copyError { throw error }
+                if let metadata = try? IPAIconReader.read(target),
+                   let artwork = try? IPAIconImage.artwork(from: metadata) {
+                    imported.append((metadata, artwork))
+                }
             }
+            return imported
         }.value
+        let previous = games
+        var filled = 0
+        for (metadata, artwork) in imported {
+            for index in games.indices where games[index].artwork == nil && metadata.matches(launchURL: games[index].launchURL) {
+                games[index].artwork = artwork
+                filled += 1
+            }
+        }
+        do { if filled > 0 { try save() } }
+        catch { games = previous; refresh(); throw error }
+        importNotice = filled > 0
+            ? "IPA imported. Game icons added to \(filled) game\(filled == 1 ? "" : "s")."
+            : "IPA imported. To use its icon for an existing game, long-press the game, choose Change artwork, then Use icon from IPA."
         refresh()
     }
 }
@@ -112,7 +133,8 @@ struct LauncherView: View {
                 List {
                     Section {
                         Button("Import IPA", systemImage: "square.and.arrow.down") { importing = true }.disabled(busy)
-                        if busy { ProgressView("Copying IPA files…") }
+                        if busy { ProgressView("Importing IPAs and reading icons…") }
+                        if let notice = library.importNotice { Text(notice).font(.footnote).foregroundStyle(.secondary) }
                     } footer: { Text("Files are copied into this app. Share an IPA to your installation tool, then return to Games to add its launch link.") }
                     Section("Your IPA files") {
                         ForEach(library.files, id: \.self) { file in
@@ -225,6 +247,7 @@ struct ArtworkEditor: View {
     let game: Game
     let save: (Data?) -> Void
     @State private var selection: PhotosPickerItem?
+    @State private var choosingIPA = false
     @State private var artwork: Data?
     @State private var loading = false
     @State private var message: String?
@@ -240,7 +263,9 @@ struct ArtworkEditor: View {
                     GameArtwork(data: artwork).frame(height: 260).clipped()
                     PhotosPicker(selection: $selection, matching: .images) {
                         Label("Choose from Photos", systemImage: "photo.on.rectangle")
-                    }
+                    }.disabled(loading)
+                    Button("Use icon from IPA", systemImage: "shippingbox") { choosingIPA = true }
+                        .disabled(loading)
                     if loading { ProgressView("Loading artwork…") }
                     if let message { Text(message).foregroundStyle(.red) }
                     if artwork != nil {
@@ -248,13 +273,26 @@ struct ArtworkEditor: View {
                             .disabled(loading)
                     }
                 } header: { Text(game.name) }
-                  footer: { Text("Choose a cover or screenshot saved in Photos. Artwork stays in your library.") }
+                  footer: { Text("Read the icon from your game’s IPA or choose a cover from Photos. The same artwork appears on its launch cartridge.") }
             }
             .navigationTitle("Game artwork")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save(artwork); dismiss() }.disabled(loading)
+                }
+            }
+            .fileImporter(isPresented: $choosingIPA, allowedContentTypes: [UTType(filenameExtension: "ipa") ?? .data]) { result in
+                switch result {
+                case .success(let url):
+                    loading = true
+                    message = nil
+                    Task {
+                        defer { loading = false }
+                        do { artwork = try await IPAIconImage.read(url) }
+                        catch { message = error.localizedDescription }
+                    }
+                case .failure(let error): message = error.localizedDescription
                 }
             }
             .task(id: selection) {
