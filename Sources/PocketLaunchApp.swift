@@ -181,7 +181,7 @@ struct LauncherView: View {
                     ContentUnavailableView("Your games, together", systemImage: "gamecontroller.fill",
                                            description: Text("Add an installed game and its launch link to get started."))
                 }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), alignment: .top)], spacing: 16) {
                     ForEach(filtered) { game in gameCard(game) }
                 }.padding()
             }
@@ -221,11 +221,11 @@ struct LauncherView: View {
     }
 
     private func gameCard(_ game: Game) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            GameArtwork(data: game.artwork)
-                .frame(height: 150).frame(maxWidth: .infinity).clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-            Text(game.name).font(.headline).lineLimit(2)
+        VStack(alignment: .leading, spacing: 10) {
+            LibraryCartridgeView(artwork: game.artwork)
+            Text(game.name).font(.headline)
+                .lineLimit(2, reservesSpace: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             if game.artwork == nil, let status = library.artworkStatuses[game.id] {
                 Text(status).font(.caption).foregroundStyle(.secondary)
             }
@@ -235,8 +235,8 @@ struct LauncherView: View {
             }
             .buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
         }
-        .padding().frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 8)
         .contextMenu { gameMenu(game) }
     }
 
