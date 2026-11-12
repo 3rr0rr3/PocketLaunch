@@ -162,7 +162,7 @@ struct LauncherView: View {
                           allowedContentTypes: [UTType(filenameExtension: "ipa") ?? .data],
                           allowsMultipleSelection: true,
                           onCompletion: handleImport)
-            .alert("PocketLaunch", isPresented: showingError) {
+            .alert("Iphone Switch", isPresented: showingError) {
                 Button("OK") { error = nil }
             } message: { Text(error ?? "") }
     }
@@ -177,7 +177,7 @@ struct LauncherView: View {
     private var gamesTab: some View {
         NavigationStack {
             CartridgeShelfView(games: filtered, onPlay: playGame) { game in gameMenu(game) }
-                .navigationTitle("PocketLaunch")
+                .navigationTitle("Iphone Switch")
                 .navigationBarTitleDisplayMode(.inline)
                 .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search games")
                 .toolbar { Button("Add game", systemImage: "plus") { addGame = true } }
