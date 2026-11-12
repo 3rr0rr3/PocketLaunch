@@ -89,7 +89,7 @@ struct CartridgeShelfView<Menu: View>: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(slot.game.name)
         .accessibilityValue(slot.position == 0 ? "Selected" : "")
-        .accessibilityHint("Select this game, then use Play")
+        .accessibilityHint("Select this game, then use Insert")
         .contextMenu { menu(slot.game) }
     }
 
@@ -105,7 +105,7 @@ struct CartridgeShelfView<Menu: View>: View {
                 if game.artwork == nil {
                     Text("Artwork unavailable").font(.caption).foregroundStyle(.secondary)
                 }
-                Button("Play", systemImage: "play.fill") { onPlay(game) }
+                Button("Insert", systemImage: "play.fill") { onPlay(game) }
                     .font(.body.weight(.semibold))
                     .buttonStyle(.borderedProminent)
                     .buttonBorderShape(.capsule)

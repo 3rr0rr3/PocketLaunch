@@ -177,6 +177,8 @@ struct LauncherView: View {
     private var gamesTab: some View {
         NavigationStack {
             CartridgeShelfView(games: filtered, onPlay: playGame) { game in gameMenu(game) }
+                .background { GamingPatternBackground() }
+                .toolbarBackground(.hidden, for: .navigationBar)
                 .navigationTitle("Iphone Switch")
                 .navigationBarTitleDisplayMode(.inline)
                 .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search games")
