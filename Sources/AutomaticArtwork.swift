@@ -20,7 +20,7 @@ actor AutomaticArtwork {
     func artwork(launchURL: String, localFiles: [URL]) async throws -> Data {
         if let data = cached[launchURL] { return data }
         // The user has already granted access to these imported files.
-        let local = try await Task.detached(priority: .utility) {
+        let local = try await Task.detached(priority: .utility) { () throws -> Data? in
             for file in localFiles {
                 try Task.checkCancellation()
                 if let metadata = try? IPAIconReader.read(file),

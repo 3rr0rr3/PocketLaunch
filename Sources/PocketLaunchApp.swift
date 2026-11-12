@@ -127,40 +127,7 @@ struct LauncherView: View {
                     }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 16) {
                         ForEach(filtered) { game in
-                            VStack(alignment: .leading, spacing: 14) {
-                                GameArtwork(data: game.artwork)
-                                    .frame(height: 150)
-                                    .frame(maxWidth: .infinity)
-                                    .clipped()
-                                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                                Text(game.name).font(.headline).lineLimit(2)
-                                if game.artwork == nil, let status = library.artworkStatuses[game.id] {
-                                    Text(status).font(.caption).foregroundStyle(.secondary)
-                                }
-                                Button("Play", systemImage: "play.fill") {
-                                    guard launchingGame == nil else { return }
-                                    launchingGame = game
-                                }
-                                    .buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
-                            }
-                            .padding().frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24))
-                            .contextMenu {
-                                Button("Change artwork", systemImage: "photo") { artworkGame = game }
-                                if game.artwork == nil {
-                                    Button("Find artwork automatically", systemImage: "sparkles") {
-                                        if let index = library.games.firstIndex(where: { $0.id == game.id }) {
-                                            library.games[index].automaticArtworkDisabled = false
-                                            persist()
-                                            artworkRetry += 1
-                                        }
-                                    }
-                                }
-                                Button(game.favorite ? "Unfavorite" : "Favorite", systemImage: "star") {
-                                    if let i = library.games.firstIndex(where: { $0.id == game.id }) { library.games[i].favorite.toggle(); persist() }
-                                }
-                                Button("Remove", role: .destructive) { library.games.removeAll { $0.id == game.id }; persist() }
-                            }
+                            gameCard(game)
                         }
                     }.padding()
                 }
@@ -231,6 +198,52 @@ struct LauncherView: View {
         }
         .alert("PocketLaunch", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("OK") { error = nil } } message: { Text(error ?? "") }
     }
+
+    private func gameCard(_ game: Game) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+                                GameArtwork(data: game.artwork)
+                                    .frame(height: 150)
+                                    .frame(maxWidth: .infinity)
+                                    .clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                                Text(game.name).font(.headline).lineLimit(2)
+                                if game.artwork == nil, let status = library.artworkStatuses[game.id] {
+                                    Text(status).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Button("Play", systemImage: "play.fill") {
+                                    guard launchingGame == nil else { return }
+                                    launchingGame = game
+                                }
+                                    .buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
+                            }
+                            .padding().frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24))
+.contextMenu { gameMenu(game) }
+    }
+
+    @ViewBuilder private func gameMenu(_ game: Game) -> some View {
+
+                                Button("Change artwork", systemImage: "photo") { artworkGame = game }
+                                if game.artwork == nil {
+                                    Button("Find artwork automatically", systemImage: "sparkles") {
+                                        if let index = library.games.firstIndex(where: { $0.id == game.id }) {
+                                            library.games[index].automaticArtworkDisabled = false
+                                            persist()
+                                            artworkRetry += 1
+                                        }
+                                    }
+                                }
+                                Button(game.favorite ? "Unfavorite" : "Favorite", systemImage: "star") {
+                                    if let i = library.games.firstIndex(where: { $0.id == game.id }) { library.games[i].favorite.toggle(); persist() }
+                                }
+                                Button("Remove", role: .destructive) { removeGame(game) }
+    }
+
+    private func removeGame(_ game: Game) {
+        library.games.removeAll(where: { candidate in candidate.id == game.id })
+        persist()
+    }
+
     func persist() { do { try library.save() } catch { self.error = error.localizedDescription } }
     func launch(_ value: String) {
         guard let url = URL(string: value), url.scheme != nil else { error = "Enter a valid game launch link."; return }
