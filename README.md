@@ -31,3 +31,13 @@ The reader supports binary and XML plists, primary icon declarations, legacy ico
 The metadata reader is tested with synthetic IPA archives by `swift test` in the build workflow. Actual IPA icon decoding and the iPhone UI still require device validation.
 
 Archive reading uses [ZIPFoundation 0.9.20](https://github.com/weichsel/ZIPFoundation/tree/0.9.20), under its MIT license.
+
+## Automatic artwork for existing games
+
+When PocketLaunch opens, and whenever a game is added, it fills missing artwork without a picker. It first checks any IPAs already imported into its library, then recognizes NX2Apple title IDs in SideStore/AltStore launch links and uses the matching game icon from Nintendo's image CDN. Existing custom covers are preserved.
+
+The build creates a compact icon URL index from [blawar/titledb](https://github.com/blawar/titledb) and includes its MIT license. South Park: The Stick of Truth's exact title ID (010095300B6A4000) has an icon bundled for offline first launch. Other indexed games need internet once; downloaded icons are saved with the game. Online artwork is the title's store icon and may differ from a custom icon in a converted IPA.
+
+The app cannot read other installed apps' private icon files. Unsupported title IDs or offline failures show a status on the card. Long-press a blank card and choose Find artwork automatically to retry. The exact IPA icon can still be read from a file you import or select. Removing artwork manually disables automatic filling for that game until retried.
+
+CI checks title-ID parsing, image host restrictions, decoding the real bundled South Park icon, and inclusion of the icon and index in the final app, alongside the archive-reader tests.

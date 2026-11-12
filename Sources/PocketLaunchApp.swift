@@ -9,18 +9,43 @@ struct Game: Identifiable, Codable {
     var launchURL: String
     var favorite = false
     var artwork: Data?
+    var automaticArtworkDisabled: Bool?
 }
 
 @MainActor final class Library: ObservableObject {
     @Published var games: [Game] = []
     @Published var files: [URL] = []
     @Published var importNotice: String?
+    @Published var artworkStatuses: [UUID: String] = [:]
     let root = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     var archive: URL { root.appendingPathComponent("IPAs", isDirectory: true) }
     var index: URL { root.appendingPathComponent("games.json") }
     init() {
         games = (try? JSONDecoder().decode([Game].self, from: Data(contentsOf: index))) ?? []
         refresh()
+    }
+    func resolveMissingArtwork() async {
+        let pending = games.filter { $0.artwork == nil && $0.automaticArtworkDisabled != true }
+        for game in pending {
+            guard !Task.isCancelled else { return }
+            artworkStatuses[game.id] = "Finding artwork…"
+            do {
+                let data = try await AutomaticArtwork.shared.artwork(launchURL: game.launchURL, localFiles: files)
+                try Task.checkCancellation()
+                guard let index = games.firstIndex(where: { $0.id == game.id }),
+                      games[index].artwork == nil, games[index].automaticArtworkDisabled != true else { continue }
+                games[index].artwork = data
+                do { try save() }
+                catch { games[index].artwork = nil; throw error }
+                artworkStatuses[game.id] = nil
+            } catch is CancellationError {
+                artworkStatuses[game.id] = nil
+                return
+            } catch {
+                artworkStatuses[game.id] = (error as? AutomaticArtworkError)?.errorDescription
+                    ?? "Couldn’t load artwork. Long-press to retry."
+            }
+        }
     }
     func save() throws { try JSONEncoder().encode(games).write(to: index, options: .atomic) }
     func refresh() {
@@ -82,6 +107,7 @@ struct LauncherView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var launchingGame: Game?
     @State private var artworkGame: Game?
+    @State private var artworkRetry = 0
     @State private var query = ""
     @State private var addGame = false
     @State private var importing = false
@@ -108,6 +134,9 @@ struct LauncherView: View {
                                     .clipped()
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
                                 Text(game.name).font(.headline).lineLimit(2)
+                                if game.artwork == nil, let status = library.artworkStatuses[game.id] {
+                                    Text(status).font(.caption).foregroundStyle(.secondary)
+                                }
                                 Button("Play", systemImage: "play.fill") {
                                     guard launchingGame == nil else { return }
                                     launchingGame = game
@@ -118,6 +147,15 @@ struct LauncherView: View {
                             .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24))
                             .contextMenu {
                                 Button("Change artwork", systemImage: "photo") { artworkGame = game }
+                                if game.artwork == nil {
+                                    Button("Find artwork automatically", systemImage: "sparkles") {
+                                        if let index = library.games.firstIndex(where: { $0.id == game.id }) {
+                                            library.games[index].automaticArtworkDisabled = false
+                                            persist()
+                                            artworkRetry += 1
+                                        }
+                                    }
+                                }
                                 Button(game.favorite ? "Unfavorite" : "Favorite", systemImage: "star") {
                                     if let i = library.games.firstIndex(where: { $0.id == game.id }) { library.games[i].favorite.toggle(); persist() }
                                 }
@@ -163,16 +201,20 @@ struct LauncherView: View {
                 .zIndex(100)
             }
         }
+        .task(id: library.games.map { $0.id.uuidString + $0.launchURL }.joined() + "\(artworkRetry)-\(scenePhase)") {
+            if scenePhase == .active { await library.resolveMissingArtwork() }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { launchingGame = nil }
         }
         .sheet(item: $artworkGame) { game in
             ArtworkEditor(game: game) { data in
                 guard let index = library.games.firstIndex(where: { $0.id == game.id }) else { return }
-                let previous = library.games[index].artwork
+                let previous = library.games[index]
                 library.games[index].artwork = data
+                library.games[index].automaticArtworkDisabled = data == nil
                 do { try library.save() }
-                catch { library.games[index].artwork = previous; self.error = error.localizedDescription }
+                catch { library.games[index] = previous; self.error = error.localizedDescription }
             }
         }
         .sheet(isPresented: $addGame) { AddGameView { game in library.games.append(game); persist() } }

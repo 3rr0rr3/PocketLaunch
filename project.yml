@@ -11,7 +11,11 @@ targets:
   PocketLaunch:
     type: application
     platform: iOS
-    sources: [Sources, IPACore]
+    sources:
+      - path: Sources
+      - path: IPACore
+      - path: Resources/AutomaticArtwork
+        buildPhase: resources
     dependencies:
       - package: ZIPFoundation
     settings:
