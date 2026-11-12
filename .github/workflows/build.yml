@@ -35,7 +35,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: automatic-artwork-preview
-          path: automatic-artwork-preview.png
+          path: |
+            automatic-artwork-preview.png
+            ipa-library-preview.png
       - uses: actions/upload-artifact@v4
         with:
           name: clean-cartridge-animation

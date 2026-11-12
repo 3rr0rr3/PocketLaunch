@@ -102,7 +102,6 @@ struct Game: Identifiable, Codable {
     var body: some Scene {
         WindowGroup {
             rootView.preferredColorScheme(.dark)
-                .font(ArcadeTypography.font(12))
         }
     }
 
@@ -154,6 +153,13 @@ struct LauncherView: View {
     var body: some View {
         gamesTab
             .tint(.mint)
+            .onAppear {
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--preview-ipa-library") {
+                    showingIPALibrary = true
+                }
+                #endif
+            }
             .overlay { launchOverlay }
             .task(id: artworkLookupKey) {
                 if scenePhase == .active { await library.resolveMissingArtwork() }

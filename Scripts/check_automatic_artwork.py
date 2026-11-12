@@ -32,7 +32,7 @@ saved = documents / "games.json"
 custom = base64.b64encode(b"existing-custom-artwork-must-not-be-overwritten").decode()
 ids = [str(uuid.uuid4()).upper() for _ in range(3)]
 games = [
-    {"id": ids[0], "name": "South Park", "launchURL": "sidestore-org.nxnative.010095300b6a4000.5V7XAX44YG://", "favorite": True},
+    {"id": ids[0], "name": "Animal Crossings New Horizon", "launchURL": "sidestore-org.nxnative.010095300b6a4000.5V7XAX44YG://", "favorite": True},
     {"id": ids[1], "name": "Custom cover", "launchURL": "org.nxnative.010095300b6a4000://", "favorite": False, "artwork": custom},
     {"id": ids[2], "name": "Unknown game", "launchURL": "unknown-game://", "favorite": False},
 ]
@@ -52,6 +52,11 @@ assert by_id[ids[1]]["artwork"] == custom
 assert not by_id[ids[2]].get("artwork")
 subprocess.run(["xcrun", "simctl", "io", device, "screenshot", "automatic-artwork-preview.png"], check=True)
 print("PASS: existing South Park card filled automatically; custom artwork and favorites preserved.")
+
+# Review utility text separately from the arcade home headings.
+subprocess.run(["xcrun", "simctl", "launch", "--terminate-running-process", device, BUNDLE, "--preview-ipa-library"], check=True)
+time.sleep(3)
+subprocess.run(["xcrun", "simctl", "io", device, "screenshot", "ipa-library-preview.png"], check=True)
 
 # Capture the real native animation. This preview route exists only in Debug builds.
 import signal
