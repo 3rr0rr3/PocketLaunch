@@ -12,5 +12,5 @@ assert struct.unpack(">II", png[16:24]) == (1024, 1024)
 assert png[25] == 2, "Icon must be opaque RGB"
 print("Verified app name, unchanged bundle identifier, and compiled app icon")
 
-assert (app / "PressStart2P-Regular.ttf").stat().st_size > 10000, "Missing arcade font"
+assert (app / "VT323-Regular.ttf").stat().st_size > 10000, "Missing arcade font"
 assert (app / "OFL.txt").is_file(), "Missing font license"

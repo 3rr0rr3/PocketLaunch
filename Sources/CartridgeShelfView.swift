@@ -97,18 +97,18 @@ struct CartridgeShelfView<Menu: View>: View {
         if let game = selectedGame {
             VStack(spacing: 16) {
                 Text(game.name)
-                    .font(ArcadeTypography.font(14, relativeTo: .title3))
-                    .lineSpacing(8)
+                    .font(ArcadeTypography.font(26, relativeTo: .title3))
+                    .lineSpacing(4)
                     .padding(.vertical, 4)
                     .multilineTextAlignment(.center)
                     .lineLimit(3, reservesSpace: false)
                     .minimumScaleFactor(0.8)
-                    .frame(maxWidth: 320, minHeight: 56)
+                    .frame(maxWidth: 260, minHeight: 56)
                 if game.artwork == nil {
                     Text("Artwork unavailable").font(.caption).foregroundStyle(.secondary)
                 }
                 Button("Insert", systemImage: "play.fill") { onPlay(game) }
-                    .font(ArcadeTypography.font(14))
+                    .font(ArcadeTypography.font(26))
                     .buttonStyle(.borderedProminent)
                     .buttonBorderShape(.capsule)
                     .controlSize(.large)

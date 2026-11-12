@@ -3,7 +3,7 @@ import UIKit
 import CoreText
 
 enum ArcadeTypography {
-    static let name = "PressStart2P-Regular"
+    static let name = "VT323-Regular"
 
     static func register() {
         guard let url = Bundle.main.url(forResource: name, withExtension: "ttf") else {

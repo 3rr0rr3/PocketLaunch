@@ -192,7 +192,7 @@ struct LauncherView: View {
                 .toolbar {
                     ToolbarItem(placement: .principal) {
                         Text("Iphone Switch")
-                            .font(ArcadeTypography.font(13, relativeTo: .headline))
+                            .font(ArcadeTypography.font(24, relativeTo: .headline))
                             .lineLimit(1).minimumScaleFactor(0.75)
                             .accessibilityAddTraits(.isHeader)
                     }
