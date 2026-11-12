@@ -58,6 +58,8 @@ struct Game: Identifiable, Codable {
 struct LauncherView: View {
     @EnvironmentObject var library: Library
     @Environment(\.openURL) var openURL
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var launchingGame: Game?
     @State private var artworkGame: Game?
     @State private var query = ""
     @State private var addGame = false
@@ -85,7 +87,10 @@ struct LauncherView: View {
                                     .clipped()
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
                                 Text(game.name).font(.headline).lineLimit(2)
-                                Button("Play", systemImage: "play.fill") { launch(game.launchURL) }
+                                Button("Play", systemImage: "play.fill") {
+                                    guard launchingGame == nil else { return }
+                                    launchingGame = game
+                                }
                                     .buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
                             }
                             .padding().frame(maxWidth: .infinity, alignment: .leading)
@@ -125,6 +130,20 @@ struct LauncherView: View {
                 }.navigationTitle("IPA Library")
             }.tabItem { Label("IPAs", systemImage: "shippingbox") }
         }.tint(.mint)
+        .overlay {
+            if let game = launchingGame {
+                CartridgeLaunchView(game: game, cancel: { launchingGame = nil }) {
+                    guard launchingGame?.id == game.id else { return }
+                    launchingGame = nil
+                    launch(game.launchURL)
+                }
+                .id(game.id)
+                .zIndex(100)
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { launchingGame = nil }
+        }
         .sheet(item: $artworkGame) { game in
             ArtworkEditor(game: game) { data in
                 guard let index = library.games.firstIndex(where: { $0.id == game.id }) else { return }
