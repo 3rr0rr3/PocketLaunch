@@ -98,7 +98,24 @@ struct Game: Identifiable, Codable {
 
 @main struct PocketLaunchApp: App {
     @StateObject private var library = Library()
-    var body: some Scene { WindowGroup { LauncherView().environmentObject(library).preferredColorScheme(.dark) } }
+    var body: some Scene { WindowGroup { rootView.preferredColorScheme(.dark) } }
+
+    @ViewBuilder private var rootView: some View {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--preview-cartridge") {
+            let artwork = Bundle.main.url(forResource: "010095300B6A4000", withExtension: "jpg")
+                .flatMap { try? Data(contentsOf: $0) }
+            CartridgeLaunchView(
+                game: Game(name: "South Park", launchURL: "preview://", artwork: artwork),
+                cancel: {}, finish: {}
+            )
+        } else {
+            LauncherView().environmentObject(library)
+        }
+        #else
+        LauncherView().environmentObject(library)
+        #endif
+    }
 }
 
 struct LauncherView: View {

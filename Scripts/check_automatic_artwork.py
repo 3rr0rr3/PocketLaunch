@@ -52,3 +52,22 @@ assert by_id[ids[1]]["artwork"] == custom
 assert not by_id[ids[2]].get("artwork")
 subprocess.run(["xcrun", "simctl", "io", device, "screenshot", "automatic-artwork-preview.png"], check=True)
 print("PASS: existing South Park card filled automatically; custom artwork and favorites preserved.")
+
+# Capture the real native animation. This preview route exists only in Debug builds.
+import signal
+recording = subprocess.Popen(
+    ["xcrun", "simctl", "io", device, "recordVideo", "--codec=h264", "clean-cartridge-animation.mp4"],
+    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+)
+try:
+    time.sleep(1)
+    subprocess.run(["xcrun", "simctl", "launch", "--terminate-running-process", device, BUNDLE, "--preview-cartridge"], check=True)
+    time.sleep(0.3)
+    subprocess.run(["xcrun", "simctl", "io", device, "screenshot", "clean-cartridge-start.png"], check=True)
+    time.sleep(6)
+    subprocess.run(["xcrun", "simctl", "io", device, "screenshot", "clean-cartridge-finish.png"], check=True)
+finally:
+    recording.send_signal(signal.SIGINT)
+    recording.wait(timeout=30)
+assert pathlib.Path("clean-cartridge-animation.mp4").stat().st_size > 1000
+print("Captured clean cartridge animation with the selected game's artwork.")
