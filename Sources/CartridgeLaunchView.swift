@@ -10,6 +10,15 @@ struct CartridgeLaunchView: View {
     @State private var cardAngle: Double = 7
     @State private var phoneOffset: CGFloat = 0
     @State private var illuminated = false
+    @State private var screenFlash: Double = 0
+    private let screenArtwork: UIImage?
+
+    init(game: Game, cancel: @escaping () -> Void, finish: @escaping () -> Void) {
+        self.game = game
+        self.cancel = cancel
+        self.finish = finish
+        self.screenArtwork = game.artwork.flatMap { UIImage(data: $0) }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -39,6 +48,8 @@ struct CartridgeLaunchView: View {
                 try await Task.sleep(for: .seconds(3))
             }
             #endif
+            let clock = ContinuousClock()
+            let launchDeadline = clock.now.advanced(by: .seconds(3))
             if reduceMotion {
                 cardY = 163
                 cardAngle = 0
@@ -57,8 +68,14 @@ struct CartridgeLaunchView: View {
                 withAnimation(.easeIn(duration: 0.18)) { cardY = 163 }
                 withAnimation(.easeOut(duration: 0.25)) { phoneOffset = 0 }
                 try await Task.sleep(for: .milliseconds(180))
-                withAnimation(.easeOut(duration: 0.28)) { illuminated = true }
-                try await Task.sleep(for: .milliseconds(300))
+                // The screen wakes after insertion; its camera cutout stays above this layer.
+                withAnimation(.easeOut(duration: 0.14)) { screenFlash = 0.27 }
+                try await Task.sleep(for: .milliseconds(140))
+                withAnimation(.easeOut(duration: 0.28)) {
+                    screenFlash = 0
+                    illuminated = true
+                }
+                try await clock.sleep(until: launchDeadline)
             }
             try Task.checkCancellation()
             finish()
@@ -115,12 +132,27 @@ struct CartridgeLaunchView: View {
         ZStack {
             LinearGradient(colors: [Color(red: 0.07, green: 0.1, blue: 0.12), Color(white: 0.02)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
-            CartridgeDisplayArtwork(data: game.artwork)
-                .scaleEffect(illuminated ? 1 : 1.06).opacity(illuminated ? 0.8 : 0)
-            LinearGradient(colors: [.black.opacity(0.3), .clear, .black.opacity(0.4)],
-                           startPoint: .top, endPoint: .bottom)
-            LinearGradient(colors: [.white.opacity(0.035), .clear, .white.opacity(0.012)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            VStack(spacing: 14) {
+                if let image = screenArtwork {
+                    Image(uiImage: image)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: 104, height: 104)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                Text(game.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .frame(maxWidth: 130)
+                Capsule().fill(.mint).frame(width: 24, height: 2)
+            }
+            .opacity(illuminated ? 1 : 0)
+            Color(red: 0.74, green: 0.92, blue: 1)
+                .opacity(screenFlash)
+                .allowsHitTesting(false)
         }
         .frame(width: 158, height: 334).clipped()
         .clipShape(RoundedRectangle(cornerRadius: 28))
