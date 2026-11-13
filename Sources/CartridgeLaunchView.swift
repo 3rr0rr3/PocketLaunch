@@ -11,6 +11,7 @@ struct CartridgeLaunchView: View {
     @State private var phoneOffset: CGFloat = 0
     @State private var illuminated = false
     @State private var screenFlash: Double = 0
+    @State private var loadingProgress: CGFloat = 0
     private let screenArtwork: UIImage?
 
     init(game: Game, cancel: @escaping () -> Void, finish: @escaping () -> Void) {
@@ -54,6 +55,7 @@ struct CartridgeLaunchView: View {
                 cardY = 163
                 cardAngle = 0
                 illuminated = true
+                loadingProgress = 1
                 try await Task.sleep(for: .milliseconds(250))
             } else {
                 try await Task.sleep(for: .milliseconds(100))
@@ -75,6 +77,7 @@ struct CartridgeLaunchView: View {
                     screenFlash = 0
                     illuminated = true
                 }
+                withAnimation(.linear(duration: 0.65)) { loadingProgress = 1 }
                 try await clock.sleep(until: launchDeadline)
             }
             try Task.checkCancellation()
@@ -147,7 +150,13 @@ struct CartridgeLaunchView: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
                     .frame(maxWidth: 130)
-                Capsule().fill(.mint).frame(width: 24, height: 2)
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.mint.opacity(0.2))
+                    Capsule().fill(.mint)
+                        .frame(width: 24 * loadingProgress)
+                }
+                .frame(width: 24, height: 2)
+                .clipShape(Capsule())
             }
             .opacity(illuminated ? 1 : 0)
             Color(red: 0.74, green: 0.92, blue: 1)
