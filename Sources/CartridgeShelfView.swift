@@ -142,8 +142,8 @@ private struct ShelfCartridgeFace: View {
                     .foregroundStyle(.white.opacity(0.65))
                     .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.7)
                     .padding(.horizontal, 3)
-                    .frame(width: 59, height: 50.5)
-                    .offset(x: 4.5, y: 24)
+                    .frame(width: 59, height: 67.5)
+                    .offset(x: 4.5, y: 7)
             }
         }
         .frame(width: 68, height: 94)

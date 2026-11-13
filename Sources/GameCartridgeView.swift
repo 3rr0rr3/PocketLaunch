@@ -40,8 +40,7 @@ struct GameCartridgeView: View {
 
     private var label: some View {
         VStack(spacing: 0) {
-            header
-            CartridgeDisplayArtwork(data: artwork).frame(width: 59, height: 50.5).clipped()
+            CartridgeDisplayArtwork(data: artwork).frame(width: 59, height: 67.5).clipped()
             Text("LP-XXXXX-XXX-0")
                 .font(.system(size: 3.5, weight: .medium, design: .monospaced))
                 .tracking(0.35).foregroundStyle(.white)
@@ -51,68 +50,6 @@ struct GameCartridgeView: View {
         .clipShape(RoundedRectangle(cornerRadius: 3))
     }
 
-    private var header: some View {
-        ZStack(alignment: .topLeading) {
-            LinearGradient(colors: [Color(red: 0.89, green: 0, blue: 0.04),
-                                    Color(red: 0.77, green: 0, blue: 0.035)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
-            CartridgeSwitchMark().frame(width: 19, height: 13).offset(x: 20, y: 1.6)
-            Image(systemName: "key.fill")
-                .font(.system(size: 6, weight: .medium)).foregroundStyle(.white)
-                .rotationEffect(.degrees(-40))
-                .frame(width: 8, height: 8).offset(x: 47, y: 3)
-        }
-        .frame(width: 59, height: 17)
-    }
-}
-
-private struct CartridgeSwitchMark: View {
-    var body: some View {
-        VStack(spacing: 0.3) {
-            HStack(alignment: .center, spacing: 1.2) {
-                ZStack(alignment: .topLeading) {
-                    CartridgeJoycon(right: false).stroke(.white, lineWidth: 0.7)
-                        .frame(width: 3.7, height: 7.3)
-                    Circle().fill(.white).frame(width: 1.1, height: 1.1).offset(x: 1.4, y: 1.6)
-                    CartridgeJoycon(right: true).fill(.white)
-                        .frame(width: 3.7, height: 7.3).offset(x: 5.1)
-                    Circle().fill(Color(red: 0.83, green: 0, blue: 0.04))
-                        .frame(width: 1.2, height: 1.2).offset(x: 6.35, y: 4.2)
-                }.frame(width: 8.8, height: 7.6)
-                Text("2").font(.system(size: 10.2, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-            }.frame(height: 8.4)
-            Text("NINTENDO").font(.system(size: 2.05, weight: .semibold))
-                .tracking(0.55).foregroundStyle(.white)
-            Text("SWITCH").font(.system(size: 3.5, weight: .bold))
-                .tracking(0.2).foregroundStyle(.white)
-        }.frame(width: 19, height: 13)
-    }
-}
-
-private struct CartridgeJoycon: Shape {
-    let right: Bool
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let radius = rect.width * 0.65
-        if right {
-            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
-            path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + radius), control: CGPoint(x: rect.maxX, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
-            path.addQuadCurve(to: CGPoint(x: rect.maxX - radius, y: rect.maxY), control: CGPoint(x: rect.maxX, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        } else {
-            path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.minX + radius, y: rect.minY))
-            path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.minY + radius), control: CGPoint(x: rect.minX, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
-            path.addQuadCurve(to: CGPoint(x: rect.minX + radius, y: rect.maxY), control: CGPoint(x: rect.minX, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        }
-        path.closeSubpath()
-        return path
-    }
 }
 
 private struct CartridgeArrow: Shape {
