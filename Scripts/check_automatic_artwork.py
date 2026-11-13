@@ -69,7 +69,7 @@ try:
     subprocess.run(["xcrun", "simctl", "launch", "--terminate-running-process", device, BUNDLE, "--preview-cartridge"], check=True)
     time.sleep(0.3)
     subprocess.run(["xcrun", "simctl", "io", device, "screenshot", "clean-cartridge-start.png"], check=True)
-    time.sleep(6)
+    time.sleep(8)
     subprocess.run(["xcrun", "simctl", "io", device, "screenshot", "clean-cartridge-finish.png"], check=True)
 finally:
     recording.send_signal(signal.SIGINT)

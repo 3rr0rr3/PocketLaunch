@@ -115,12 +115,24 @@ struct CartridgeLaunchView: View {
         ZStack {
             LinearGradient(colors: [Color(red: 0.07, green: 0.1, blue: 0.12), Color(white: 0.02)],
                            startPoint: .topLeading, endPoint: .bottomTrailing)
-            CartridgeDisplayArtwork(data: game.artwork)
-                .scaleEffect(illuminated ? 1 : 1.06).opacity(illuminated ? 0.8 : 0)
-            LinearGradient(colors: [.black.opacity(0.3), .clear, .black.opacity(0.4)],
-                           startPoint: .top, endPoint: .bottom)
-            LinearGradient(colors: [.white.opacity(0.035), .clear, .white.opacity(0.012)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            VStack(spacing: 14) {
+                if let data = game.artwork, let image = UIImage(data: data) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: 104, height: 104)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                Text(game.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .frame(maxWidth: 130)
+                Capsule().fill(.mint).frame(width: 24, height: 2)
+            }
+            .opacity(illuminated ? 1 : 0)
         }
         .frame(width: 158, height: 334).clipped()
         .clipShape(RoundedRectangle(cornerRadius: 28))
